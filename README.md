@@ -505,6 +505,9 @@ sections = {
       show_filename_only = true,   -- Shows shortened relative path when set to false.
       hide_filename_extension = false,   -- Hide filename extension when set to true.
       show_modified_status = true, -- Shows indicator when the buffer is modified.
+      jump_to_buffer_win = false, -- When set to true, clicking on a buffer also switches
+                                  -- to the buffer's window instead of replacing the
+                                  -- current window's buffer.
 
       mode = 0, -- 0: Shows buffer name
                 -- 1: Shows buffer index
