@@ -234,24 +234,90 @@ function M.buffer_jump(buf_pos, bang)
   vim.api.nvim_set_current_buf(M.bufpos2nr[buf_pos])
 end
 
+M.prior_windows = {}
+
+function M.is_winfixbuf(win_id)
+  if vim.fn.exists("&winfixbuf") == 1 then
+    win_id = win_id or vim.api.nvim_get_current_win()
+    return vim.api.nvim_get_option_value("winfixbuf", { win = win_id })
+  end
+  return false
+end
+
+-- Get the closest available previous window that we can switch to,
+-- that is valid and is not fixed (has a buffer that cannot be replaced).
+-- Inspired by a similar function by the neo-tree.nvim contributors.
+function M.get_prior_window()
+  local tabid = vim.api.nvim_get_current_tabpage()
+  local wins = M.prior_windows[tabid]
+  if wins == nil then
+    return -1
+  end
+  local win_index = #wins
+  while win_index > 0 do
+    local last_win = wins[win_index]
+    if type(last_win) == "number" then
+      local success, is_valid = pcall(vim.api.nvim_win_is_valid, last_win)
+      if success and is_valid and not M.is_winfixbuf(last_win) then
+        return last_win
+      end
+    end
+    win_index = win_index - 1
+  end
+  return -1
+end
+
+function M.jump_to_prior_window_or_split()
+  local prior_window = M.get_prior_window()
+  if prior_window == -1 then
+    vim.cmd("new")
+  else
+    pcall(vim.api.nvim_set_current_win, prior_window)
+  end
+end
+
+function M.is_floating(win_id)
+  win_id = win_id or vim.api.nvim_get_current_win()
+  local cfg = vim.api.nvim_win_get_config(win_id)
+  if cfg.relative > "" or cfg.external then
+    return true
+  end
+  return false
+end
+
+vim.api.nvim_create_autocmd("WinEnter", {
+  callback = function(_)
+    local winid = vim.api.nvim_get_current_win()
+    if M.is_floating(winid) then
+      return
+    end
+
+    local tabid = vim.api.nvim_get_current_tabpage()
+    if M.prior_windows[tabid] == nil then
+      M.prior_windows[tabid] = {}
+    end
+    table.insert(M.prior_windows[tabid], winid)
+
+    -- prune the history when it gets too big
+    local new_prior_windows = M.prior_windows[tabid]
+    if #new_prior_windows > 25 then
+      local new_array = {}
+      local win_count = #new_prior_windows
+      for i = 80, win_count do
+        table.insert(new_array, new_prior_windows[i])
+      end
+      M.prior_windows[tabid] = new_array
+    end
+  end
+})
+
 vim.cmd([[
   function! LualineSwitchBuffer(bufnr, mouseclicks, mousebutton, modifiers)
     " Don't try to overwrite buffer in a window which forbids it
     " Instead, find first suitable window and place it there,
     " otherwise create a new window
     if exists('&winfixbuf') && &winfixbuf
-      let l:nextwin = 'nowin'
-      for i in range(1, winnr('$'))
-        if ! getwinvar(i, "&winfixbuf", 0)
-          let l:nextwin = win_getid(i)
-          break
-        endif
-      endfor
-      if l:nextwin == 'nowin'
-        new
-      else
-        call win_gotoid(l:nextwin)
-      endif
+      lua require'lualine.components.buffers'.jump_to_prior_window_or_split()
     endif
     execute ":buffer " . a:bufnr
   endfunction
