@@ -241,12 +241,44 @@ vim.cmd([[
     " otherwise create a new window
     if exists('&winfixbuf') && &winfixbuf
       let l:nextwin = 'nowin'
-      for i in range(1, winnr('$'))
-        if ! getwinvar(i, "&winfixbuf", 0)
-          let l:nextwin = win_getid(i)
+      let l:wins = gettabinfo(tabpagenr())[0].windows
+      let l:currwinindex = index(l:wins, win_getid(winnr()))
+      if l:currwinindex >= 0 && len(l:wins) >= 2
+        " Get list of previous windows in reverse order, so we go back to the
+        " most recently used window by starting from the last one
+        " Here we rotate the list such that the current win would go to the
+        " start:
+        " [... PRIOR WINS ..., CURR WIN, ... NEXT WINS ...]
+        " becomes
+        " [... NEXT WINS ..., ... PRIOR WINS ...]
+        " that is, if we keep executing ':wincmd e', that's the order in which
+        " we will traverse the windows.
+        " Then, during iteration, we'll go from last to first, thus taking
+        " the first prior window until the last. This ensures we go back to a
+        " window the user would expect us to, not to the first created window.
+        if l:currwinindex > 0
+          let l:next_wins = l:wins[l:currwinindex+1:] + l:wins[:l:currwinindex-1]
+        else
+          " No windows before, so the first prior window simply wraps back to the
+          " last 'next' window.
+          let l:next_wins = l:wins[l:currwinindex+1:]
+        endif
+      else
+        " Just get all windows since for some reason winnr() isn't there...
+        let l:next_wins = l:wins
+      endif
+
+      " Iterating 'next windows' in reverse order is the same as iterating
+      " 'prior windows' in order of previous window to the last prior window.
+      for i in range(1, len(l:next_wins))
+        let l:prior_win_id = l:next_wins[-i]
+        let l:prior_winnr = win_id2win(l:prior_win_id)
+        if prior_winnr > 0 && ! getwinvar(prior_winnr, "&winfixbuf", 0)
+          let l:nextwin = prior_win_id
           break
         endif
       endfor
+
       if l:nextwin == 'nowin'
         new
       else
