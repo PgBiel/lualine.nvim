@@ -61,7 +61,11 @@ end
 ---@param name string
 ---@return string
 function Buffer:configure_mouse_click(name)
-  return string.format('%%%s@LualineSwitchBuffer@%s%%T', self.bufnr, name)
+  if self.options.jump_to_buffer_win then
+    return string.format('%%%s@LualineSwitchBufferAndWin@%s%%T', self.bufnr, name)
+  else
+    return string.format('%%%s@LualineSwitchBuffer@%s%%T', self.bufnr, name)
+  end
 end
 
 ---returns rendered buffer

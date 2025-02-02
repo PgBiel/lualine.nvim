@@ -9,6 +9,7 @@ local default_options = {
   show_filename_only = true,
   hide_filename_extension = false,
   show_modified_status = true,
+  jump_to_buffer_win = false,
   mode = 0,
   max_length = 0,
   filetype_names = {
@@ -236,6 +237,16 @@ end
 
 vim.cmd([[
   function! LualineSwitchBuffer(bufnr, mouseclicks, mousebutton, modifiers)
+    execute ":buffer " . a:bufnr
+  endfunction
+
+  function! LualineSwitchBufferAndWin(bufnr, mouseclicks, mousebutton, modifiers)
+    let l:winid = bufwinid(a:bufnr)
+    if l:winid >= 0
+      " Buffer is already in some window in this tab, so simply switch to that
+      " window instead of overriding the current one.
+      call win_gotoid(l:winid)
+    endif
     execute ":buffer " . a:bufnr
   endfunction
 
