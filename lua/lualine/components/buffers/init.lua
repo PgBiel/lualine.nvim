@@ -236,6 +236,23 @@ end
 
 vim.cmd([[
   function! LualineSwitchBuffer(bufnr, mouseclicks, mousebutton, modifiers)
+    " Don't try to overwrite buffer in a window which forbids it
+    " Instead, find first suitable window and place it there,
+    " otherwise create a new window
+    if exists('&winfixbuf') && &winfixbuf
+      let l:nextwin = 'nowin'
+      for i in range(1, winnr('$'))
+        if ! getwinvar(i, "&winfixbuf", 0)
+          let l:nextwin = win_getid(i)
+          break
+        endif
+      endfor
+      if l:nextwin == 'nowin'
+        new
+      else
+        call win_gotoid(l:nextwin)
+      endif
+    endif
     execute ":buffer " . a:bufnr
   endfunction
 
